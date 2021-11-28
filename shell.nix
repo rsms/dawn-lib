@@ -24,14 +24,11 @@ let
     is_component_build=false
     libcxx_is_shared=false
     use_glib=false
-
     use_ozone=false
     dawn_use_angle=false
 
     # Vulkan
     dawn_enable_vulkan=true
-    angle_shared_libvulkan=false
-    angle_use_custom_libvulkan=true
     dawn_enable_vulkan_loader=true
     # dawn_enable_vulkan_loader: Uses our built version of the Vulkan loader on
     # platforms where we can't assume to have one present at the system level.
@@ -40,10 +37,6 @@ let
     dawn_enable_opengles=false
     dawn_enable_desktop_gl=false
     dawn_enable_opengles=false
-    angle_enable_gl=false
-    angle_enable_gl_desktop=false
-    angle_enable_glsl=false
-    angle_enable_essl=false
     tint_build_glsl_writer=false
     tint_build_hlsl_writer=false
     tint_build_msl_writer=false
@@ -62,7 +55,7 @@ let
 in
   mkShell {
     name = "dawn";
-    buildInputs = with pkgs; [
+    buildInputs = with pkgs; [ # things needed to run the product
       x11
       xorg.libX11
       xorg.libXext
@@ -71,7 +64,7 @@ in
       xorg.libXcursor
       xorg.libXi
     ];
-    nativeBuildInputs = with pkgs; [
+    nativeBuildInputs = with pkgs; [ # things needed to build the product
       nano
       ninja
       python3
@@ -96,14 +89,30 @@ in
       echo "clang++ -Wall -std=gnu++17 -O2 -o hello_dcc hello.cc && ./hello_dcc"
             clang++ -Wall -std=gnu++17 -O2 -o hello_dcc hello.cc && ./hello_dcc
 
+      echo "Checking out depot_tools and dawn from git (if needed)"
+      [ -d depot_tools ] ||
+        git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+      [ -d dawn ] ||
+        git clone https://dawn.googlesource.com/dawn.git
+
       export PATH=$PATH:$PWD/depot_tools
-      export DAWN_BUILD_DIR=dawn/out/Debug
+      export DAWN_BUILD_DIR=out/Debug
+
+      cd dawn
+      git checkout -d 1fe05467a6da2781ae63b092d336823724a8ae4a
+      cp scripts/standalone.gclient .gclient
+      echo "running 'gclient sync' in $PWD"
+      gclient sync
 
       mkdir -p $DAWN_BUILD_DIR
       cp ${dawn_gn_args} $DAWN_BUILD_DIR/args.gn
-      (cd dawn && gn gen $DAWN_BUILD_DIR)
+      echo "running 'gn gen $DAWN_BUILD_DIR' in $PWD"
+      gn gen $DAWN_BUILD_DIR
+
+      echo "running 'ninja' in $PWD/$DAWN_BUILD_DIR"
       ninja -C $DAWN_BUILD_DIR
-      echo "Running example app $DAWN_BUILD_DIR/CHelloTriangle"
+
+      echo "running example app $DAWN_BUILD_DIR/CHelloTriangle"
       $DAWN_BUILD_DIR/CHelloTriangle
     '';
   }
