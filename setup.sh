@@ -70,6 +70,10 @@ fi
 echo "dawn installed at ./dawn"
 
 
+# echo "---------- llvm ----------"
+# TODO
+
+
 echo "---------- test compiler ----------"
 TMPDIR=out/cc-test
 rm -rf $TMPDIR

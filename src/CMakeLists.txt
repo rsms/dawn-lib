@@ -1,4 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
+cmake_policy(SET CMP0069 NEW) # INTERPROCEDURAL_OPTIMIZATION
+set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 project(wgpu)
 
@@ -7,6 +9,14 @@ add_link_options(
   $<$<COMPILE_LANGUAGE:CXX>:-stdlib=libc++>
   $<$<COMPILE_LANGUAGE:OBJCXX>:-stdlib=libc++>
 )
+
+# enable thin LTO
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+# set(LTO_LD_FLAGS
+#   "-fuse-ld=lld -Wl,--thinlto-cache-dir=${PROJECT_BINARY_DIR}/lto.cache")
+# set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${LTO_LD_FLAGS}")
+# set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${LTO_LD_FLAGS}")
+
 
 # customize dawn cmake options (must include "CACHE TYPE DESCRIPTION")
 set(TINT_BUILD_SAMPLES     OFF CACHE BOOL "customize dawn build")

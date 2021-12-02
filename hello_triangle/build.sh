@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# TODO: convert to Makefile
 set -e
 cd "$(dirname "$0")"
 
@@ -8,13 +9,14 @@ WGPU_LIB_DIR=../out/debug
 C_FLAGS=( \
   -Wall
   -g \
+  -flto=thin \
   -std=c11 \
   -I../include \
 )
 
 LD_FLAGS=( \
   -fuse-ld=lld \
-  -flto \
+  -flto=thin -Wl,--lto-O3 \
   -Werror \
   -Wl,--color-diagnostics \
   -Wl,--as-needed \
@@ -23,12 +25,14 @@ LD_FLAGS=( \
 ## Optimization flags:
 # COMPILE_FLAGS+=( -O3 -march=native )
 # LD_FLAGS+=( -Wl,--lto-O3 )
-# LD_FLAGS+=( -Wl,--strip-all -Wl,--discard-all )
+# LD_FLAGS+=( -Wl,--strip-all,--discard-all )
 
+echo "cc hello_triangle.c"
 mkdir -p bin lib obj
 clang "${C_FLAGS[@]}" -c hello_triangle.c -o obj/hello_triangle.o
 
 # statically link libwgpu, dynamically link system libs
+echo "link bin/hello_triangle"
 clang "${LD_FLAGS[@]}" -o bin/hello_triangle \
   obj/hello_triangle.o \
   -Wl,--compress-debug-sections=zlib \
@@ -36,13 +40,15 @@ clang "${LD_FLAGS[@]}" -o bin/hello_triangle \
   -lpthread -lX11 -lm -ldl
 
 # dynamically link libwgpu and system libs
+echo "link bin/hello_triangle-sh"
 cp $WGPU_LIB_DIR/libwgpu.so lib/libwgpu.so
 clang "${LD_FLAGS[@]}" -o bin/hello_triangle-sh \
   obj/hello_triangle.o \
   -Wl,--compress-debug-sections=zlib \
   -L./lib -rpath \$ORIGIN/../lib -lwgpu -lm
 
-# statically link libwgpu and system libs
+# statically link libwgpu and system libs (THIS IS WIP)
+echo "link bin/hello_triangle-static"
 clang "${LD_FLAGS[@]}" -static -o bin/hello_triangle-static \
   obj/hello_triangle.o \
   -Wl,--compress-debug-sections=zlib \
