@@ -1,4 +1,4 @@
-#include "gui.h"
+#include <wgpu.h>
 
 // we have no libc, but llvm has many functions built-in
 #define fabs __builtin_fabs
@@ -81,6 +81,7 @@ static WGPURenderPipeline create_pipeline(
 
 
 void hello_triangle_set_device(WGPUDevice device) {
+  check_notnull(device);
   wgpuDeviceReference(device);
   if (g_device)
     wgpuDeviceRelease(g_device);
@@ -106,6 +107,7 @@ void hello_triangle_set_device(WGPUDevice device) {
   if (g_pipeline)
     wgpuRenderPipelineRelease(g_pipeline);
   g_pipeline = create_pipeline(device, vsmod, fsmod);
+  check_notnull(g_pipeline);
 
   wgpuShaderModuleRelease(vsmod);
   wgpuShaderModuleRelease(fsmod);
@@ -113,6 +115,7 @@ void hello_triangle_set_device(WGPUDevice device) {
 
 
 void hello_triangle_set_surface(WGPUSurface surface) {
+  check_notnull(surface);
   wgpuSurfaceReference(surface);
   if (g_surface)
     wgpuSurfaceRelease(g_surface);
@@ -128,6 +131,7 @@ void hello_triangle_set_surface(WGPUSurface surface) {
   if (g_swapchain)
     wgpuSwapChainRelease(g_swapchain);
   g_swapchain = wgpuDeviceCreateSwapChain(g_device, surface, &scdesc);
+  check_notnull(g_swapchain);
 }
 
 
@@ -186,9 +190,11 @@ void render_frame() {
 
 __attribute__((visibility("default")))
 int main(int argc, const char** argv) {
-  WGPUDevice device = gui_select_device();
-  WGPUSurface surface = gui_create_surface();
-  while (gui_poll()) {
+  WGPUDevice device = wgpu_select_device();
+  WGPUSurface surface = wgpu_create_surface();
+  hello_triangle_set_device(device);
+  hello_triangle_set_surface(surface);
+  while (wgpu_surface_poll()) {
     render_frame();
   }
   return 0;

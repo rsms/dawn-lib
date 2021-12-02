@@ -2,79 +2,75 @@
 set -e
 cd "$(dirname "$0")"
 
-# apk add libx11-dev libxrandr-dev
-# apk add lld
+WGPU_LIB_DIR=../out/debug
+[ -d $WGPU_LIB_DIR ] || WGPU_LIB_DIR=../out/release
 
-[ hello_triangle.o -nt hello_triangle.cc ] ||
-cc -Wall -std=c11 -c hello_triangle.c -o hello_triangle.o \
-  -I../dawn-dest/include
+C_FLAGS=( \
+  -Wall
+  -g \
+  -std=c11 \
+  -I../include \
+)
 
-[ gui_glfw.o -nt gui_glfw.cc ] ||
-c++ -Wall -std=c++17 -c gui_glfw.cc -o gui_glfw.o \
-  -I../dawn-dest/include \
-  -I../dawn/third_party/glfw/include \
-  -I../dawn/third_party/khronos \
-  -I../dawn/src/include \
-  -I../dawn/src
-
-DAWN_LIBS=( $(find ../dawn/out/Debug -name '*.a') )
-echo "DAWN_LIBS="
-for f in "${DAWN_LIBS[@]}"; do
-  echo "  $f"
-done
-
-# -nostdlib++
-# -rdynamic
-# -pie -fPIC
-
-c++ \
+LD_FLAGS=( \
   -fuse-ld=lld \
+  -flto \
   -Werror \
-  -m64 \
-  -static \
-  -Wl,--fatal-warnings \
-  -Wl,--build-id \
-  -Wl,-z,noexecstack \
-  -Wl,-z,relro \
-  -Wl,-z,now \
   -Wl,--color-diagnostics \
-  -Wl,--no-call-graph-profile-sort \
-  -Wl,--gdb-index \
-  -Wl,-z,defs \
   -Wl,--as-needed \
-  -Wl,--disable-new-dtags \
-  -o hello_triangle \
-  hello_triangle.o \
-  gui_glfw.o \
-  "${DAWN_LIBS[@]}"
+)
 
+## Optimization flags:
+# COMPILE_FLAGS+=( -O3 -march=native )
+# LD_FLAGS+=( -Wl,--lto-O3 )
+# LD_FLAGS+=( -Wl,--strip-all -Wl,--discard-all )
 
-## attemt to use system ld
-# c++ \
-#   -Werror \
-#   -m64 \
-#   -static \
-#   -Wl,--fatal-warnings \
-#   -Wl,--build-id \
-#   -Wl,-z,noexecstack \
-#   -Wl,-z,relro \
-#   -Wl,-z,now \
-#   -Wl,-z,defs \
-#   -Wl,--as-needed \
-#   -Wl,--disable-new-dtags \
-#   -o hello_triangle \
-#   hello_triangle.o \
-#   gui_glfw.o \
-#   "${DAWN_LIBS[@]}"
+mkdir -p bin lib obj
+clang "${C_FLAGS[@]}" -c hello_triangle.c -o obj/hello_triangle.o
 
-# libs = -ldl -lpthread -lrt -lX11 -lXcursor -lXinerama -lXrandr
-# include_dirs = -I../.. -Igen -Igen/src/include -I../../src/include
-#                -Igen/src -I../../src -I../../third_party/khronos
-#                -I../../third_party/glfw/include
+# statically link libwgpu, dynamically link system libs
+clang "${LD_FLAGS[@]}" -o bin/hello_triangle \
+  obj/hello_triangle.o \
+  -Wl,--compress-debug-sections=zlib \
+  $WGPU_LIB_DIR/libwgpu.a \
+  -lpthread -lX11 -lm -ldl
 
-# notes
-#
-# vulkan/vulkan.h found in both:
-#   ../dawn/third_party/vulkan-deps/vulkan-headers/src/include
-#   ../dawn/third_party/khronos
+# dynamically link libwgpu and system libs
+cp $WGPU_LIB_DIR/libwgpu.so lib/libwgpu.so
+clang "${LD_FLAGS[@]}" -o bin/hello_triangle-sh \
+  obj/hello_triangle.o \
+  -Wl,--compress-debug-sections=zlib \
+  -L./lib -rpath \$ORIGIN/../lib -lwgpu -lm
 
+# statically link libwgpu and system libs
+clang "${LD_FLAGS[@]}" -static -o bin/hello_triangle-static \
+  obj/hello_triangle.o \
+  -Wl,--compress-debug-sections=zlib \
+  -L$WGPU_LIB_DIR -lwgpu \
+  -lpthread -lm -ldl -lX11 -lxcb -lXau -lXdmcp
+
+# create stripped versions
+for f in hello_triangle hello_triangle-sh hello_triangle-static; do
+  strip -o bin/$f-stripped bin/$f &
+done
+wait
+
+# ---- print some stats ----
+_objdump_dylib() {
+  printf "objdump_dylib $1:"
+  local OUT=$(\
+    objdump -p "$1" \
+    | grep -E 'NEEDED|RUNPATH|RPATH' \
+    | awk '{printf "  " $1 " " $2 "\n"}' )
+  if [ -n "$OUT" ]; then
+    echo
+    echo "$OUT"
+  else
+    echo " (not dynamically linked)"
+  fi
+}
+
+_objdump_dylib bin/hello_triangle
+_objdump_dylib bin/hello_triangle-sh
+
+ls -lh lib/*.so bin/hello_triangle*

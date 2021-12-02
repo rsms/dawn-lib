@@ -1,45 +1,43 @@
-Builds dawn on Linux as static libraries and runs the CHelloTriangle example
+Builds dawn on Linux as one library
+
+This is an experiment for [playsys](https://github.com/playbit/playsys)
+
+The goal with this experiment is to make it less complex to build programs using dawn
+by allowing simplified linking with a single library. Eventually this will make it
+into playsys for the Linux host wgpu implementation.
 
 
 ## Build
 
-Requires [nix](https://nixos.org/guides/install-nix.html)
+Requirements to build: (setup.sh checks for all of these)
+
+- [clang >=12](https://github.com/llvm/llvm-project/releases/tag/llvmorg-13.0.0)
+- bash
+- cmake >=3.10
+- wget
+- git
+- ninja
+- python3
+- sha256sum
+- tar
+
+First time setup: (or after `git pull`)
 
 ```sh
-nix-shell --pure shell.nix
-# build example app
+./setup.sh
+```
+
+Build libwgpu:
+
+```sh
+./build.sh
+# ./build.sh -clean  # rebuild from scratch
+```
+
+Build & run example program: (must be in X11 shell to run)
+
+```sh
 ./hello_triangle/build.sh
-
-# exit nix shell and try the demo program:
-# (this may or may not work; dynamically linked)
-./dawn/out/Debug/CHelloTriangle
+./hello_triangle/bin/hello_triangle
 ```
-
-To clean the build results (eg to rebuild):
-
-```sh
-rm -rf dawn/out
-```
-
-
-## Known issues
-
-
-### `hello_triangle/build.sh` fails
-
-This is expected as linking dawn is a work in progress
-
-
-### `Assertion failure at dawn_native/vulkan/NativeSwapChainImplVk.cpp`
-
-When resizing the window of one of the example apps, the vulkan swapchain
-seem to fail. This appears to be a bug in Dawn.
-
-
-### X11 and a other shared libs needed for the example apps
-
-For the demo program to work, your terminal session must have the
-appropriate X11 env vars set.
-Alternatively you can exit the nix shell after it's done building
-and run the CHelloTriangle app in the host env.
 

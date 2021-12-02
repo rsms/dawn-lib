@@ -1,4 +1,8 @@
-#include "gui.h"
+#include "../include/wgpu.h"
+
+#include <dawn/webgpu_cpp.h>
+#include <dawn/dawn_proc.h>
+#include <dawn_native/DawnNative.h>
 
 #if defined(__linux__)
   // no <GL/gl.h>
@@ -6,7 +10,7 @@
   #define GLFW_INCLUDE_VULKAN
 #endif
 #include <GLFW/glfw3.h>
-#include <utils/GLFWUtils.h> /* from dawn */
+//#include <utils/GLFWUtils.h> /* from dawn */
 
 #if defined(WIN32)
   #define GLFW_EXPOSE_NATIVE_WIN32
@@ -14,9 +18,6 @@
   #define GLFW_EXPOSE_NATIVE_X11
 #endif
 #include "GLFW/glfw3native.h"
-
-#include <dawn/dawn_proc.h>
-#include <dawn_native/DawnNative.h>
 
 #include <memory> // unique_ptr
 #include <vector>
@@ -30,6 +31,8 @@
     fprintf(stderr, format " \e[2m(%s %d)\e[0m\n", ##__VA_ARGS__, __FUNCTION__, __LINE__); \
     fflush(stderr); \
   })
+  static const char* backend_type_name(wgpu::BackendType);
+  static const char* adapter_type_name(wgpu::AdapterType);
 #else
   #define dlog(...) do{}while(0)
 #endif
@@ -38,7 +41,8 @@
 static wgpu::BackendType     gBackendType = wgpu::BackendType::Vulkan;
 static GLFWwindow*           gWindow;
 static DawnProcTable         gNativeProcs;
-static dawn_native::Instance gDawnNative;
+// static dawn_native::Instance gDawnNative;
+static dawn_native::Instance* gDawnNative = nullptr;
 static struct {
   u32   width, height;
   float dpscale;
@@ -65,9 +69,10 @@ static void init() {
   // Set up the native procs for the global proctable
   gNativeProcs = dawn_native::GetProcs();
   dawnProcSetProcs(&gNativeProcs);
-  gDawnNative.DiscoverDefaultAdapters();
-  gDawnNative.EnableBackendValidation(true);
-  gDawnNative.SetBackendValidationLevel(dawn_native::BackendValidationLevel::Full);
+  gDawnNative = new dawn_native::Instance();
+  gDawnNative->DiscoverDefaultAdapters();
+  gDawnNative->EnableBackendValidation(true);
+  gDawnNative->SetBackendValidationLevel(dawn_native::BackendValidationLevel::Full);
 }
 
 
@@ -94,7 +99,7 @@ static dawn_native::Adapter select_adapter() {
     // }
   );
 
-  std::vector<dawn_native::Adapter> adapters = gDawnNative.GetAdapters();
+  std::vector<dawn_native::Adapter> adapters = gDawnNative->GetAdapters();
 
   for (auto reqType : typePriority) {
     for (const dawn_native::Adapter& adapter : adapters) {
@@ -129,7 +134,7 @@ static void onFramebufferResize(GLFWwindow* window, int width, int height) {
 }
 
 
-WGPUDevice gui_select_device() {
+WGPUDevice wgpu_select_device() {
   init();
   static dawn_native::Adapter adapter; // FIXME: match lifetime of device
   adapter = select_adapter();
@@ -139,7 +144,7 @@ WGPUDevice gui_select_device() {
 }
 
 
-WGPUSurface gui_create_surface() {
+WGPUSurface wgpu_create_surface() {
   init();
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -152,7 +157,7 @@ WGPUSurface gui_create_surface() {
   std::unique_ptr<wgpu::ChainedStruct> sd1 = surf_wgpu_descriptor(gWindow);
   wgpu::SurfaceDescriptor descriptor;
   descriptor.nextInChain = sd1.get();
-  wgpu::Surface surface = wgpu::Instance(gDawnNative.Get()).CreateSurface(&descriptor);
+  wgpu::Surface surface = wgpu::Instance(gDawnNative->Get()).CreateSurface(&descriptor);
   if (!surface)
     return nullptr;
   WGPUSurface surf = surface.Get();
@@ -160,37 +165,39 @@ WGPUSurface gui_create_surface() {
   return surf;
 }
 
-
-bool gui_poll() {
+bool wgpu_surface_poll() {
   if (glfwWindowShouldClose(gWindow))
     return false;
   glfwWaitEvents();
   return true;
 }
 
-static const char* backend_type_name(wgpu::BackendType t) {
-  switch (t) {
-    case wgpu::BackendType::Null:     return "Null";
-    case wgpu::BackendType::WebGPU:   return "WebGPU";
-    case wgpu::BackendType::D3D11:    return "D3D11";
-    case wgpu::BackendType::D3D12:    return "D3D12";
-    case wgpu::BackendType::Metal:    return "Metal";
-    case wgpu::BackendType::Vulkan:   return "Vulkan";
-    case wgpu::BackendType::OpenGL:   return "OpenGL";
-    case wgpu::BackendType::OpenGLES: return "OpenGLES";
-  }
-  return "?";
-}
 
-static const char* adapter_type_name(wgpu::AdapterType t) {
-  switch (t) {
-    case wgpu::AdapterType::DiscreteGPU:   return "DiscreteGPU";
-    case wgpu::AdapterType::IntegratedGPU: return "IntegratedGPU";
-    case wgpu::AdapterType::CPU:           return "CPU";
-    case wgpu::AdapterType::Unknown:       return "Unknown";
+#ifdef DEBUG
+  static const char* backend_type_name(wgpu::BackendType t) {
+    switch (t) {
+      case wgpu::BackendType::Null:     return "Null";
+      case wgpu::BackendType::WebGPU:   return "WebGPU";
+      case wgpu::BackendType::D3D11:    return "D3D11";
+      case wgpu::BackendType::D3D12:    return "D3D12";
+      case wgpu::BackendType::Metal:    return "Metal";
+      case wgpu::BackendType::Vulkan:   return "Vulkan";
+      case wgpu::BackendType::OpenGL:   return "OpenGL";
+      case wgpu::BackendType::OpenGLES: return "OpenGLES";
+    }
+    return "?";
   }
-  return "?";
-}
+  static const char* adapter_type_name(wgpu::AdapterType t) {
+    switch (t) {
+      case wgpu::AdapterType::DiscreteGPU:   return "DiscreteGPU";
+      case wgpu::AdapterType::IntegratedGPU: return "IntegratedGPU";
+      case wgpu::AdapterType::CPU:           return "CPU";
+      case wgpu::AdapterType::Unknown:       return "Unknown";
+    }
+    return "?";
+  }
+#endif // defined(DEBUG)
+
 
 #if defined(WIN32)
   static std::unique_ptr<wgpu::ChainedStruct> surf_wgpu_descriptor(GLFWwindow* win) {

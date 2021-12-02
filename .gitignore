@@ -1,2 +1,8 @@
 /dawn
 /depot_tools
+/out
+/hello_triangle/bin
+/hello_triangle/lib
+/hello_triangle/obj
+/include/webgpu.h
+/_*
