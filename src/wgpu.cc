@@ -38,7 +38,23 @@
 #endif
 
 
-static wgpu::BackendType     gBackendType = wgpu::BackendType::Vulkan;
+// kBackendType -- Dawn backend type.
+// Default to D3D12, Metal, Vulkan, OpenGL in that order as D3D12 and Metal are the
+// preferred on their respective platforms, and Vulkan is preferred to OpenGL
+static const wgpu::BackendType kBackendType =
+#if defined(DAWN_ENABLE_BACKEND_D3D12)
+  wgpu::BackendType::D3D12;
+#elif defined(DAWN_ENABLE_BACKEND_METAL)
+  wgpu::BackendType::Metal;
+#elif defined(DAWN_ENABLE_BACKEND_VULKAN)
+  wgpu::BackendType::Vulkan;
+#elif defined(DAWN_ENABLE_BACKEND_OPENGL)
+  wgpu::BackendType::OpenGL;
+#else
+#  error
+#endif
+;
+
 static GLFWwindow*           gWindow;
 static DawnProcTable         gNativeProcs;
 // static dawn_native::Instance gDawnNative;
@@ -49,7 +65,10 @@ static struct {
 } gFramebuffer;
 
 
-static std::unique_ptr<wgpu::ChainedStruct> surf_wgpu_descriptor(GLFWwindow*);
+#if !defined(__APPLE__)
+static
+#endif
+std::unique_ptr<wgpu::ChainedStruct> surf_wgpu_descriptor(GLFWwindow*);
 
 
 static void report_glfw_error(int code, const char* message) {
@@ -106,7 +125,7 @@ static dawn_native::Adapter select_adapter() {
       wgpu::AdapterProperties ap;
       adapter.GetProperties(&ap);
       if (ap.adapterType == reqType &&
-          (reqType == wgpu::AdapterType::CPU || ap.backendType == gBackendType) )
+          (reqType == wgpu::AdapterType::CPU || ap.backendType == kBackendType) )
       {
         dlog("selected adapter %s (device=0x%x vendor=0x%x type=%s/%s)",
           ap.name, ap.deviceID, ap.vendorID,
@@ -215,8 +234,8 @@ bool wgpu_surface_poll() {
     desc->window = glfwGetX11Window(win);
     return std::move(desc);
   }
-// #elif defined(__APPLE__)
-//   // SetupWindowAndGetSurfaceDescriptorForTesting defined in GLFWUtils_metal.mm
+#elif defined(__APPLE__)
+  // implemented in wgpu_metal.mm
 #else
   #warning unknown wgpu backend implementation
   static std::unique_ptr<wgpu::ChainedStruct> surf_wgpu_descriptor(GLFWwindow* win) {

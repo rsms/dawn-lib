@@ -1,5 +1,4 @@
-/dawn
-/depot_tools
+/deps
 /out
 /hello_triangle/bin
 /hello_triangle/lib
