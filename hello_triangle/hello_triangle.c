@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 #include <wgpu.h>
 
 // we have no libc, but llvm has many functions built-in

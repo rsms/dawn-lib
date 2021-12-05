@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef DAWN_ENABLE_BACKEND_METAL
 #error !DAWN_ENABLE_BACKEND_METAL
 #endif
