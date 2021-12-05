@@ -118,8 +118,6 @@ DEPOT_TOOLS_REV=2e486c0d9d44e651a4def1d8397e4dfa1871ee65
 _git_dep $DEPS/depot_tools \
   https://chromium.googlesource.com/chromium/tools/depot_tools.git \
   $DEPOT_TOOLS_REV || true
-
-export PATH=depot_tools:$PATH
 echo "ready: $DEPS/depot_tools (git $DEPOT_TOOLS_REV)"
 
 
